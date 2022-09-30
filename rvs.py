@@ -17,7 +17,7 @@ class MLPConfig:
     lr : float = 0.0001
     intermediate_dim : int = 1024
     num_hidden_layers : int = 2
-    batch_size = 16
+    batch_size = 1024
 
 class RvSMLP(nn.Module):
     def __init__(self, config : MLPConfig):
@@ -68,12 +68,18 @@ class RMLP(nn.Module):
 
 def train(config : MLPConfig, dataset : Dataset, mainNet : RvSMLP, actionNet : AMLP, rewardNet : RMLP):
     dl = DataLoader(dataset, MLPConfig.batch_size, True)
+    mainNet.to(config.device)
+    actionNet.to(config.device)
+    rewardNet.to(config.device)
     mainOptim = t.optim.Adam(mainNet.parameters(), config.lr)
     actionOptim = t.optim.Adam(actionNet.parameters(),config.lr)
     rewardOptim = t.optim.Adam(rewardNet.parameters(), config.lr)
     loss = nn.CrossEntropyLoss()
     for _ in tqdm(range(config.epochs)):
         for r, s, a in dl:
+            r = r.to(config.device)
+            s = s.to(config.device)
+            a = a.to(config.device)
             aPredCond = mainNet(r,s)
             aPredUnCond = actionNet(s)
             rPredUnCond = rewardNet(s)

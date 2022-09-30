@@ -6,7 +6,8 @@ from torch.utils.data import Dataset, TensorDataset
 from typing import Tuple
 
 def test1() -> Tuple[Dataset, MLPConfig]:
-    config = MLPConfig(2, 1, 2, 'cpu', 1000)
+    device = 'cuda' if t.cuda.is_available() else 'cpu'
+    config = MLPConfig(2, 1, 2, device, 1000)
     states = t.rand((1000,1))
     actions = t.randint(2,(1000,))
     rewards = t.logical_xor(states.squeeze(1) > 0.5, actions).long()
