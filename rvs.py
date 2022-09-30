@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from tqdm import tqdm
 import torch as t
 import torch.nn as nn
 from dataclasses import dataclass
@@ -71,7 +72,7 @@ def train(config : MLPConfig, dataset : Dataset, mainNet : RvSMLP, actionNet : A
     actionOptim = t.optim.Adam(actionNet.parameters(),config.lr)
     rewardOptim = t.optim.Adam(rewardNet.parameters(), config.lr)
     loss = nn.CrossEntropyLoss()
-    for _ in range(config.epochs):
+    for _ in tqdm(range(config.epochs)):
         for r, s, a in dl:
             aPredCond = mainNet(r,s)
             aPredUnCond = actionNet(s)

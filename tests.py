@@ -9,7 +9,7 @@ def test1() -> Tuple[Dataset, MLPConfig]:
     config = MLPConfig(2, 1, 2, 'cpu', 1000)
     states = t.rand((1000,1))
     actions = t.randint(2,(1000,))
-    rewards = t.logical_xor(states.squeeze(1) > 0.5, t.argmax(actions, 1)).long()
+    rewards = t.logical_xor(states.squeeze(1) > 0.5, actions).long()
     return (TensorDataset(rewards, states, actions), config)
 # %%
 
@@ -22,5 +22,4 @@ def runTest1():
     return (mainNet, actionNet, rewardNet)
 
 # %%
-runTest1()
 # %%
