@@ -1,0 +1,8 @@
+- when you shift back to decision transformers some things to look at:
+  - say we have a dataset that has the structure ```'player' action1 action2 action3 ...```
+  - say there is an expert in the dataset, 'iskander' 
+  - a DT is trained where only some of the sequences have reward labels. 
+  - will the DT learn to imitate 'iskander' even in situations 'iskander' has been found in but haven't received any reward labels? 
+- if not, it feels like there should be some sort of google pagerank style thing that iteratively finds experts or something. 
+- what sort of factored cognition stuff gets useful stuff with current RL?
+- kinda interested in mixed language / proof assistant search models. 
