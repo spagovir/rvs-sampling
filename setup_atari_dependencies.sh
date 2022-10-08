@@ -8,4 +8,6 @@ cd ..
 python -m atari_py.import_roms atari-roms/ROMS/
 pip install ale-py
 ale-import-roms atari-roms/ROMS/
+git submodule init
+git submodule update
 pip install -r dopamine/requirements.txt
