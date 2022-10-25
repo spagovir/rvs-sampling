@@ -11,3 +11,6 @@ ale-import-roms atari-roms/ROMS/
 git submodule init
 git submodule update
 pip install -r dopamine/requirements.txt
+pip install wandb
+wandb login
+pip install einops
