@@ -21,11 +21,12 @@ class MLPConfig:
     device : str
     epochs : int
     batches_per_buffer : int
-    lr : float = 0.0001
+    lr : float = 0.00025
     intermediate_dim : int = 1024
     num_hidden_layers : int = 2
     batch_size = 1024
     save_every = 10000
+    log_every = 100
 
 class RvSMLP(nn.Module):
     def __init__(self, config : MLPConfig):
@@ -105,12 +106,14 @@ class TrainLogger:
         self.name = name
         wandb.init(project=name)
         self.chkpt = 0
-    def log(self, i, aPredCondLoss, aPredUnCondLoss, rPredUnCondLoss):
+    def log(self, i, aPredCondLoss, aPredUnCondLoss, rPredUnCondLoss, running_min_max):
         wandb.log(
-        { "steps": i 
+        { "step": i 
         , "conditioned action loss": aPredCondLoss
         , "unconditioned action loss": aPredUnCondLoss
-        , "unconditioned reward loss": rPredUnCondLoss})
+        , "unconditioned reward loss": rPredUnCondLoss
+        , "running min": running_min_max[0]
+        , "running max": running_min_max[1]})
     def save(self, state_dict):
         t.save(state_dict, f"./checkpoints/{self.name}-{self.chkpt}")
         wandb.save(f"./checkpoints/{self.name}-{self.chkpt}")
@@ -148,17 +151,18 @@ def train(config : MLPConfig, dataset : Dataset, model : RvSModel, saveDir : str
 
 
 def trainWDopamine(config : MLPConfig, game : str, model : RvSModel, logger : TrainLogger):
-    # buffers = [
-        # RtGBuffer(
-            # observation_shape=(84,84), 
-            # stack_size = 4, 
-            # replay_capacity = 2000000, 
-            # batch_size = 32,
-            # update_horizon=200)
-        # for i in range(50)
-    # ]
-    # for i in tqdm(range(50)):
-        # buffers[i].load(f"./atari_data/dqn/{game}/1/replay_logs/", i)
+    buffers = [
+        RtGBuffer(
+            observation_shape=(84,84), 
+            stack_size = 4, 
+            replay_capacity = 1000000, 
+            batch_size = 32,
+            update_horizon=4000,
+            gamma = 0.99999)
+        for i in range(10)
+    ]
+    for i in tqdm(range(10)):
+        buffers[i].load(f"./atari_data/dqn/{game}/1/replay_logs/", 5 * i)
     model.to(config.device)
     mainOptim = t.optim.Adam(model.mainNet.parameters(), config.lr)
     actionOptim = t.optim.Adam(model.actionNet.parameters(),config.lr)
@@ -166,41 +170,43 @@ def trainWDopamine(config : MLPConfig, game : str, model : RvSModel, logger : Tr
     loss = nn.CrossEntropyLoss()
     steps = 0
     for epoch in tqdm(range(config.epochs)):
-        buffer_idxs = t.randperm(50)
-        for buffer_idx in buffer_idxs:
-            buffer = RtGBuffer(
-                observation_shape=(84,84), 
-                stack_size = 4, 
-                replay_capacity = 1000000, 
-                batch_size = 32,
-                update_horizon=200)
-            buffer.load(f"./atari_data/dqn/{game}/1/replay_logs/", buffer_idx)
-            for _ in range(config.batches_per_buffer): 
-                s, a, r, _, _, _, _, _ = buffer.sample_transition_batch()
-                r = t.from_numpy(r).to(config.device)
-                s = t.from_numpy(s).to(config.device)
-                a = t.from_numpy(a).to(config.device).long()
-                s = rearrange(s, "b h w s -> b (h w s)").float()
-                binnedR, aPredCond, aPredUnCond, rPredUnCond = model(r,s)
-                aPredCondLoss = loss(aPredCond, a)
-                aPredUnCondLoss = loss(aPredUnCond, a)
-                rPredUnCondLoss = loss(rPredUnCond, binnedR)
-                mainOptim.zero_grad()
-                actionOptim.zero_grad()
-                rewardOptim.zero_grad()
-                aPredCondLoss.backward()
-                aPredUnCondLoss.backward()
-                rPredUnCondLoss.backward()
-                mainOptim.step()
-                actionOptim.step()
-                rewardOptim.step()
-                steps += config.batch_size
-            logger.log(steps, aPredCondLoss, aPredUnCondLoss, rPredUnCondLoss)
+        buffer_idx = t.randint(10, (1,)).item()
+        # for buffer_idx in buffer_idxs:
+            # buffer = RtGBuffer(
+                # observation_shape=(84,84), 
+                # stack_size = 4, 
+                # replay_capacity = 1000000, 
+                # batch_size = 32,
+                # update_horizon=200)
+            # buffer.load(f"./atari_data/dqn/{game}/1/replay_logs/", buffer_idx)
+        # for _ in range(config.batches_per_buffer): 
+        s, a, r, _, _, _, _, _ = buffers[buffer_idx].sample_transition_batch()
+        r = t.from_numpy(r).to(config.device)
+        s = t.from_numpy(s).to(config.device)
+        a = t.from_numpy(a).to(config.device).long()
+        s = rearrange(s, "b h w s -> b (h w s)").float() / 256
+        binnedR, aPredCond, aPredUnCond, rPredUnCond = model(r,s)
+        aPredCondLoss = loss(aPredCond, a)
+        aPredUnCondLoss = loss(aPredUnCond, a)
+        rPredUnCondLoss = loss(rPredUnCond, binnedR)
+        mainOptim.zero_grad()
+        actionOptim.zero_grad()
+        rewardOptim.zero_grad()
+        aPredCondLoss.backward()
+        aPredUnCondLoss.backward()
+        rPredUnCondLoss.backward()
+        mainOptim.step()
+        actionOptim.step()
+        rewardOptim.step()
+        steps += config.batch_size
+        if epoch % config.save_every == 0:
             logger.save(model.state_dict())
+        if epoch % config.log_every == 0:
+            logger.log(steps, aPredCondLoss, aPredUnCondLoss, rPredUnCondLoss, model.binner.running_min_max)
 
 # %%
-config = MLPConfig(128, 84*84*4, 18, 'cuda', 1000000, 1000)
+config = MLPConfig(128, 84*84*4, 18, 'cuda', 4000000, 1000)
 model = RvSModel(config)
-logger = TrainLogger("SpaceInvadersRun1")
+logger = TrainLogger("SpaceInvadersRun3")
 game = "SpaceInvaders"
 trainWDopamine(config, game, model, logger)
