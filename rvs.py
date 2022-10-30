@@ -22,7 +22,7 @@ class MLPConfig:
     epochs : int
     batches_per_buffer : int
     lr : float = 0.00025
-    intermediate_dim : int = 1024
+    intermediate_dim : int = 2048
     num_hidden_layers : int = 2
     batch_size = 1024
     save_every = 10000
@@ -205,8 +205,8 @@ def trainWDopamine(config : MLPConfig, game : str, model : RvSModel, logger : Tr
             logger.log(steps, aPredCondLoss, aPredUnCondLoss, rPredUnCondLoss, model.binner.running_min_max)
 
 # %%
-config = MLPConfig(128, 84*84*4, 18, 'cuda', 4000000, 1000)
+config = MLPConfig(32, 84*84*4, 18, 'cuda', 4000000, 1000)
 model = RvSModel(config)
-logger = TrainLogger("SpaceInvadersRun3")
+logger = TrainLogger("SpaceInvadersRun5")
 game = "SpaceInvaders"
 trainWDopamine(config, game, model, logger)
