@@ -21,12 +21,13 @@ class MLPConfig:
     device : str
     epochs : int
     batches_per_buffer : int
-    lr : float = 0.00025
+    lr : float = 0.001
     intermediate_dim : int = 2048
     num_hidden_layers : int = 2
-    batch_size = 1024
+    batch_size = 256
     save_every = 10000
-    log_every = 100
+    log_every = 4
+    reward_weight = 1
 
 class RvSMLP(nn.Module):
     def __init__(self, config : MLPConfig):
@@ -38,9 +39,10 @@ class RvSMLP(nn.Module):
             layers.append(nn.GELU())
             layers.append(nn.Linear(config.intermediate_dim, config.num_actions if i == config.num_hidden_layers - 1 else config.intermediate_dim))
         self.layers = nn.ModuleList(layers)
+        self.reward_weight = config.reward_weight
 
     def forward(self, reward : int, state : t.Tensor):
-        x = self.reward_embed(reward) + self.state_embed(state)
+        x = self.reward_embed(reward) * config.reward_weight + self.state_embed(state)
         for layer in self.layers:
             x = layer(x)
         return x
@@ -156,7 +158,7 @@ def trainWDopamine(config : MLPConfig, game : str, model : RvSModel, logger : Tr
             observation_shape=(84,84), 
             stack_size = 4, 
             replay_capacity = 1000000, 
-            batch_size = 32,
+            batch_size = config.batch_size,
             update_horizon=4000,
             gamma = 0.99999)
         for i in range(10)
@@ -205,8 +207,8 @@ def trainWDopamine(config : MLPConfig, game : str, model : RvSModel, logger : Tr
             logger.log(steps, aPredCondLoss, aPredUnCondLoss, rPredUnCondLoss, model.binner.running_min_max)
 
 # %%
-config = MLPConfig(32, 84*84*4, 18, 'cuda', 4000000, 1000)
+config = MLPConfig(32, 84*84*4, 18, 'cuda', 500000, 1000)
 model = RvSModel(config)
-logger = TrainLogger("SpaceInvadersRun5")
+logger = TrainLogger("SpaceInvadersRun6")
 game = "SpaceInvaders"
 trainWDopamine(config, game, model, logger)

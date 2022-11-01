@@ -14,3 +14,4 @@ pip install -r dopamine/requirements.txt
 pip install wandb
 wandb login
 pip install einops
+mkdir checkpoints
